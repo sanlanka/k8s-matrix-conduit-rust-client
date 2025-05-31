@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "conduit.fullname" . }}-nginx
+  labels:
+    {{- include "conduit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "conduit.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx-proxy
+  template:
+    metadata:
+      labels:
+        {{- include "conduit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: nginx-proxy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: {{ .Values.nginx.service.port | default 8443 }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+            - name: tls
+              mountPath: /etc/nginx/tls
+              readOnly: true
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "conduit.fullname" . }}-nginx-config
+        - name: tls
+          secret:
+            secretName: {{ .Values.nginx.tls.secretName | default "conduit-tls" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "conduit.fullname" . }}-nginx
+  labels:
+    {{- include "conduit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx-proxy
+spec:
+  type: {{ .Values.nginx.service.type | default "LoadBalancer" }}
+  ports:
+    - port: {{ .Values.nginx.service.port | default 8443 }}
+      targetPort: {{ .Values.nginx.service.port | default 8443 }}
+      protocol: TCP
+      name: https
+  selector:
+    {{- include "conduit.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx-proxy
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "conduit.fullname" . }}-nginx-config
+  labels:
+    {{- include "conduit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx-proxy
+data:
+  default.conf: |
+    server {
+        listen 8443 ssl;
+        server_name {{ .Values.nginx.serverName | default "conduit.local" }};
+
+        # Use kube-dns service for resolution (works across different k8s setups)
+        resolver kube-dns.kube-system.svc.cluster.local valid=5s;
+
+        ssl_certificate /etc/nginx/tls/tls.crt;
+        ssl_certificate_key /etc/nginx/tls/tls.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+
+        # Enable error logging
+        error_log /var/log/nginx/error.log debug;
+        access_log /var/log/nginx/access.log;
+
+        location = / {
+            proxy_pass http://{{ include "conduit.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:6167;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 10s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
+        }
+
+        location /_matrix/ {
+            proxy_pass http://{{ include "conduit.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:6167;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 10s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
+        }
+
+        location / {
+            proxy_pass http://{{ include "conduit.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:6167;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 10s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
+        }
+    } 

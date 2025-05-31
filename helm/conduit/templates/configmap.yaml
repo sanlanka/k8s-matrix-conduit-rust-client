@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "conduit.fullname" . }}-config
+  labels:
+    {{- include "conduit.labels" . | nindent 4 }}
+data:
+  conduit.toml: |
+    # TESTING MARKER - LOCAL FILE BEING USED
+    [global]
+    server_name = "{{ .Values.config.server_name }}"
+    database_backend = "{{ .Values.config.database_backend }}"
+    database_path = "{{ .Values.config.database_path }}"
+    port = {{ .Values.config.port }}
+    address = "{{ .Values.config.address }}"
+    allow_registration = {{ .Values.config.allow_registration }}
+    allow_federation = {{ .Values.config.allow_federation }}
+    allow_encryption = {{ .Values.config.allow_encryption }}
+    allow_jaeger = {{ .Values.config.allow_jaeger }}
+    max_request_size = 10485760  # 10MB as u32
+    max_concurrent_requests = {{ .Values.config.max_concurrent_requests }}
+    log = "{{ .Values.config.log }}"
+    
+    [tls]
+    enabled = true
+    cert_path = "/etc/conduit/tls/tls.crt"
+    key_path = "/etc/conduit/tls/tls.key" 

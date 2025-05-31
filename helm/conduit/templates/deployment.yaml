@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "conduit.fullname" . }}
+  labels:
+    {{- include "conduit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "conduit.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "conduit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+    spec:
+      serviceAccountName: {{ include "conduit.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CONDUIT_CONFIG
+              value: "/etc/conduit/conduit.toml"
+            - name: CONDUIT_DATABASE_PATH
+              value: "{{ .Values.config.database_path }}"
+            - name: CONDUIT_SERVER_NAME
+              value: "{{ .Values.config.server_name }}"
+            - name: CONDUIT_PORT
+              value: "{{ .Values.config.port }}"
+            - name: CONDUIT_ADDRESS
+              value: "{{ .Values.config.address }}"
+            - name: CONDUIT_ALLOW_REGISTRATION
+              value: "{{ .Values.config.allow_registration }}"
+            - name: CONDUIT_ALLOW_FEDERATION
+              value: "{{ .Values.config.allow_federation }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /_matrix/client/versions
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_matrix/client/versions
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/conduit/conduit.toml
+              subPath: conduit.toml
+            - name: data
+              mountPath: {{ .Values.config.database_path }}
+            - name: tls
+              mountPath: /etc/conduit/tls
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "conduit.fullname" . }}-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "conduit.fullname" . }}-data
+        - name: tls
+          secret:
+            secretName: conduit-tls
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }} 

@@ -1,0 +1,135 @@
+# Conduit Matrix Server Configuration
+replicaCount: 1
+
+image:
+  repository: matrixconduit/matrix-conduit
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 6167
+  targetPort: 6167
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: conduit.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Conduit Configuration
+config:
+  # Server settings
+  server_name: "conduit.local"
+  database_backend: "rocksdb"
+  database_path: "/var/lib/conduit/database"
+  port: 6167
+  address: "0.0.0.0"
+  
+  # Registration settings
+  allow_registration: true
+  allow_federation: false
+  allow_encryption: true
+  allow_jaeger: false
+  
+  # Limits
+  max_request_size: 10485760 # 10MB - smaller number to avoid scientific notation
+  max_concurrent_requests: 100
+  
+  # Logging
+  log: "info,rocket=warn,_=off,sled=off"
+
+# Persistent storage
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+
+# Resource limits
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# User Setup via Helm Job
+userSetup:
+  enabled: true
+  createTestRoom: true
+  users:
+    - username: "admin"
+      password: "admin123"
+      displayName: "Administrator"
+      isAdmin: true
+    - username: "bob"
+      password: "bob123"
+      displayName: "Bob Smith"
+      isAdmin: false
+    - username: "rachel"
+      password: "rachel123"
+      displayName: "Rachel Green"
+      isAdmin: false
+
+# Legacy test users config (kept for backwards compatibility)
+testUsers:
+  admin:
+    username: "admin"
+    password: "admin123"
+    displayName: "Administrator"
+    isAdmin: true
+  
+  users:
+    - username: "bob"
+      password: "bob123"
+      displayName: "Bob Smith"
+    - username: "rachel"
+      password: "rachel123"
+      displayName: "Rachel Green"
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Nginx Reverse Proxy Configuration
+nginx:
+  enabled: true
+  serverName: "conduit.local"
+  service:
+    type: LoadBalancer
+    port: 8443
+  tls:
+    secretName: "conduit-tls"
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000 

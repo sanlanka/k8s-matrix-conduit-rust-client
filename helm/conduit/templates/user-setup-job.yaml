@@ -1,0 +1,114 @@
+{{- if .Values.userSetup.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "conduit.fullname" . }}-user-setup
+  labels:
+    {{- include "conduit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: user-setup
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "conduit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: user-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: user-setup
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "🔄 Waiting for Conduit to be ready..."
+          
+          # Wait for Conduit service to be available
+          until curl -k -s https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/versions; do
+            echo "Waiting for Conduit server..."
+            sleep 5
+          done
+          
+          echo "✅ Conduit is ready, setting up users..."
+          
+          # Function to register a user
+          register_user() {
+            local username=$1
+            local password=$2
+            local display_name=$3
+            
+            echo "Registering user: $username"
+            
+            response=$(curl -k -s -w "%{http_code}" -o /tmp/register_response \
+              -X POST https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/register \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"auth\": {\"type\": \"m.login.dummy\"},
+                \"username\": \"$username\",
+                \"password\": \"$password\",
+                \"initial_device_display_name\": \"Conduit Client - $display_name\",
+                \"inhibit_login\": false
+              }")
+            
+            if [ "$response" = "200" ]; then
+              echo "✅ User $username registered successfully"
+            elif [ "$response" = "400" ]; then
+              # Check if user already exists
+              if grep -q "User ID already taken\|M_USER_IN_USE" /tmp/register_response 2>/dev/null; then
+                echo "ℹ️  User $username already exists, skipping..."
+              else
+                echo "❌ Failed to register $username: $(cat /tmp/register_response)"
+              fi
+            else
+              echo "❌ Failed to register $username (HTTP $response): $(cat /tmp/register_response)"
+            fi
+          }
+          
+          # Function to create a test room
+          create_test_room() {
+            echo "Creating test room..."
+            
+            # Login as admin to create room
+            login_response=$(curl -k -s -X POST https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/login \
+              -H "Content-Type: application/json" \
+              -d '{"type": "m.login.password", "user": "admin", "password": "admin123"}')
+            
+            access_token=$(echo "$login_response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+            
+            if [ -n "$access_token" ]; then
+              room_response=$(curl -k -s -X POST https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/createRoom \
+                -H "Authorization: Bearer $access_token" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "name": "General Discussion",
+                  "topic": "A test room for general discussion",
+                  "preset": "public_chat"
+                }')
+              
+              room_id=$(echo "$room_response" | grep -o '"room_id":"[^"]*"' | cut -d'"' -f4)
+              if [ -n "$room_id" ]; then
+                echo "🏠 Test room created: $room_id"
+              else
+                echo "❌ Failed to create test room: $room_response"
+              fi
+            else
+              echo "❌ Failed to login as admin for room creation"
+            fi
+          }
+          
+          # Register users
+          {{- range .Values.userSetup.users }}
+          register_user "{{ .username }}" "{{ .password }}" "{{ .displayName }}"
+          {{- end }}
+          
+          # Create test room if enabled
+          {{- if .Values.userSetup.createTestRoom }}
+          create_test_room
+          {{- end }}
+          
+          echo "🎉 User setup completed!"
+{{- end }} 

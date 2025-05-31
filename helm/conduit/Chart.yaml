@@ -1,0 +1,15 @@
+apiVersion: v2
+name: conduit
+description: A Helm chart for Conduit Matrix homeserver
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - matrix
+  - messaging
+  - conduit
+home: https://conduit.rs/
+sources:
+  - https://gitlab.com/famedly/conduit
+maintainers:
+  - name: matrix-dev-team 

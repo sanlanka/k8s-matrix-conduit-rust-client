@@ -1,0 +1,93 @@
+# Production Environment Values for Conduit Matrix Server
+# This file extends the base values.yaml with production-specific overrides
+
+# Production server configuration
+config:
+  server_name: "matrix.yourdomain.com"  # Replace with your actual domain
+  allow_registration: false  # Disable open registration in production
+  allow_federation: true     # Enable federation for production
+  allow_encryption: true
+  log: "info,rocket=warn,_=off,sled=off"  # Production logging level
+
+# Production resource requirements
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+# Production storage
+persistence:
+  enabled: true
+  size: 100Gi
+  storageClass: "fast-ssd"  # Use fast storage in production
+
+# Multiple replicas for high availability
+replicaCount: 2
+
+# Production ingress with TLS
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: matrix.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: matrix-tls
+      hosts:
+        - matrix.yourdomain.com
+
+# Disable user setup in production (manual user management)
+userSetup:
+  enabled: false
+  createTestRoom: false
+  users: []
+
+# Production security context
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+
+# Node selector for production nodes
+nodeSelector:
+  kubernetes.io/os: linux
+  node-type: "production"
+
+# Tolerations for production workloads
+tolerations:
+  - key: "production"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# Anti-affinity to spread pods across nodes
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - conduit
+        topologyKey: kubernetes.io/hostname
+
+# Production annotations
+podAnnotations:
+  environment: "production"
+  monitoring: "enabled" 
