@@ -28,7 +28,7 @@ spec:
           echo "🔄 Waiting for Conduit to be ready..."
           
           # Wait for Conduit service to be available
-          until curl -k -s https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/versions; do
+          until curl -k -s http://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/versions; do
             echo "Waiting for Conduit server..."
             sleep 5
           done
@@ -44,7 +44,7 @@ spec:
             echo "Registering user: $username"
             
             response=$(curl -k -s -w "%{http_code}" -o /tmp/register_response \
-              -X POST https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/register \
+              -X POST http://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/register \
               -H "Content-Type: application/json" \
               -d "{
                 \"auth\": {\"type\": \"m.login.dummy\"},
@@ -73,14 +73,14 @@ spec:
             echo "Creating test room..."
             
             # Login as admin to create room
-            login_response=$(curl -k -s -X POST https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/login \
+            login_response=$(curl -k -s -X POST http://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/login \
               -H "Content-Type: application/json" \
               -d '{"type": "m.login.password", "user": "admin", "password": "admin123"}')
             
             access_token=$(echo "$login_response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
             
             if [ -n "$access_token" ]; then
-              room_response=$(curl -k -s -X POST https://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/createRoom \
+              room_response=$(curl -k -s -X POST http://{{ include "conduit.fullname" . }}:{{ .Values.service.port }}/_matrix/client/v3/createRoom \
                 -H "Authorization: Bearer $access_token" \
                 -H "Content-Type: application/json" \
                 -d '{

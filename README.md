@@ -16,7 +16,7 @@ Perfect for building Matrix UIs, testing Matrix applications, or learning the Ma
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐     HTTPS (8443)      ┌─────────────────┐
+┌─────────────────┐     HTTPS (8448)      ┌─────────────────┐
 │   Your Browser  │ ◄─────────────────────► │ Nginx Proxy Pod │
 │  conduit.local  │                        │   (TLS Term)    │
 └─────────────────┘                        └─────────────────┘
@@ -126,10 +126,10 @@ kubectl get pods -n matrix
 kubectl get svc -n matrix
 
 # Test HTTPS endpoint
-curl -k https://conduit.local:8443
+curl -k https://conduit.local:8448
 
 # Test Matrix API
-curl -k https://conduit.local:8443/_matrix/client/versions
+curl -k https://conduit.local:8448/_matrix/client/versions
 ```
 
 #### 4. Build Rust Client (Optional)
@@ -146,11 +146,11 @@ cargo run --bin matrix-client -- --help
 
 After deployment, your Matrix Conduit server will be accessible at:
 
-- **HTTPS Endpoint:** `https://conduit.local:8443`
-- **Matrix Client API:** `https://conduit.local:8443/_matrix/client/versions`
-- **Homeserver URL:** `https://conduit.local:8443`
+- **HTTPS Endpoint:** `https://conduit.local:8448`
+- **Matrix Client API:** `https://conduit.local:8448/_matrix/client/versions`
+- **Homeserver URL:** `https://conduit.local:8448`
 
-**Note:** The LoadBalancer service automatically exposes the server on port 8443. No manual port forwarding required!
+**Note:** The LoadBalancer service automatically exposes the server on port 8448. No manual port forwarding required!
 
 ## 👥 Test Users
 
@@ -164,7 +164,7 @@ After deployment, these users are automatically created (dev environment):
 | `alice`  | `alice123` | Alice Wonder  | User  |
 | `charlie`| `charlie123` | Charlie Brown | User  |
 
-**Homeserver URL:** `https://conduit.local:8443`
+**Homeserver URL:** `https://conduit.local:8448`
 
 ## 🦀 Rust Matrix SDK Client
 
@@ -173,7 +173,7 @@ After deployment, these users are automatically created (dev environment):
 #### Send a Message
 ```bash
 cargo run --bin matrix-client -- send \
-  --homeserver https://conduit.local:8443 \
+  --homeserver https://conduit.local:8448 \
   --username rachel \
   --password rachel123 \
   --room-id "!roomid:conduit.local" \
@@ -183,7 +183,7 @@ cargo run --bin matrix-client -- send \
 #### Create a Room  
 ```bash
 cargo run --bin matrix-client -- create-room \
-  --homeserver https://conduit.local:8443 \
+  --homeserver https://conduit.local:8448 \
   --username admin \
   --password admin123 \
   --name "My Test Room" \
@@ -193,7 +193,7 @@ cargo run --bin matrix-client -- create-room \
 #### List Rooms
 ```bash
 cargo run --bin matrix-client -- list-rooms \
-  --homeserver https://conduit.local:8443 \
+  --homeserver https://conduit.local:8448 \
   --username bob \
   --password bob123
 ```
@@ -204,12 +204,12 @@ cargo run --bin matrix-client -- list-rooms \
 
 #### Check Server Status
 ```bash
-curl -k https://conduit.local:8443/_matrix/client/versions
+curl -k https://conduit.local:8448/_matrix/client/versions
 ```
 
 #### Register a User
 ```bash
-curl -k -X POST https://conduit.local:8443/_matrix/client/v3/register \
+curl -k -X POST https://conduit.local:8448/_matrix/client/v3/register \
   -H "Content-Type: application/json" \
   -d '{
     "auth": {"type": "m.login.dummy"},
@@ -220,7 +220,7 @@ curl -k -X POST https://conduit.local:8443/_matrix/client/v3/register \
 
 #### Login
 ```bash
-curl -k -X POST https://conduit.local:8443/_matrix/client/v3/login \
+curl -k -X POST https://conduit.local:8448/_matrix/client/v3/login \
   -H "Content-Type: application/json" \
   -d '{
     "type": "m.login.password",
@@ -322,7 +322,7 @@ This solves 90% of deployment issues by starting completely fresh.
 ### Common Issues
 
 #### 1. 504 Gateway Timeout
-**Symptoms:** Getting 504 errors when accessing `https://conduit.local:8443`
+**Symptoms:** Getting 504 errors when accessing `https://conduit.local:8448`
 
 **Solution:** This was a common issue we solved. Check that:
 ```bash
@@ -385,10 +385,10 @@ minikube tunnel
 
 **Solution:** Use unprivileged ports:
 ```bash
-# Use port 8443 instead of 443 (already configured in LoadBalancer)
-kubectl port-forward svc/conduit-nginx 8443:8443 -n matrix
+# Use port 8448 instead of 443 (already configured in LoadBalancer)
+kubectl port-forward svc/conduit-nginx 8448:8448 -n matrix
 
-# Access via: https://conduit.local:8443
+# Access via: https://conduit.local:8448
 ```
 
 ### Debugging Commands
@@ -513,11 +513,14 @@ This setup provides a solid foundation that scales from local development to pro
 ### Essential Commands
 
 ```bash
-# 🚀 Deploy everything from scratch
+# 🚀 Deploy everything from scratch (adds conduit.local to /etc/hosts)
+./scripts/deploy.sh
+
+# 🚀 Deploy without modifying /etc/hosts (use localhost:8448 instead)  
 ./scripts/deploy.sh --skip-hosts
 
 # 🧪 Test the Matrix API
-curl -k https://conduit.local:8443/_matrix/client/versions
+curl -k https://conduit.local:8448/_matrix/client/versions
 
 # 🔍 Check deployment status  
 kubectl get all -n matrix
@@ -529,7 +532,22 @@ kubectl get all -n matrix
 ### User Credentials (Development)
 - **Admin:** `admin` / `admin123`
 - **Users:** `bob`, `rachel`, `alice`, `charlie` / `{username}123`
-- **Server:** `https://conduit.local:8443`
+- **Server:** `https://conduit.local:8448`
+
+### Access URLs
+
+**With hosts file (default):**
+- Main URL: `https://conduit.local:8448/`
+- Matrix API: `https://conduit.local:8448/_matrix/client/versions`
+
+**Without hosts file (--skip-hosts):**
+- Main URL: `https://localhost:8448/`
+- Matrix API: `https://localhost:8448/_matrix/client/versions`
+
+**Note:** If LoadBalancer doesn't work, use port forwarding:
+```bash
+kubectl port-forward -n matrix svc/conduit-nginx 8448:8448
+```
 
 ## 📚 Scripts Reference
 
@@ -542,7 +560,7 @@ kubectl get all -n matrix
 ```bash
 ./scripts/deploy.sh [OPTIONS]
   -e, --environment ENV    Environment (dev/prod) [default: dev]
-  -n, --namespace NS       Kubernetes namespace [default: matrix]  
+  -n, --namespace NS       Kubernetes namespace [default: matrix]
   -r, --release NAME       Helm release name [default: conduit]
   -d, --domain DOMAIN      Domain name [default: conduit.local]
   --skip-hosts             Skip hosts file setup
@@ -550,11 +568,11 @@ kubectl get all -n matrix
   -h, --help              Show help
 ```
 
-### Teardown Script Options  
+### Teardown Script Options
 ```bash
 ./scripts/teardown.sh [OPTIONS]
   -n, --namespace NS       Kubernetes namespace [default: matrix]
-  -r, --release NAME       Helm release name [default: conduit]  
+  -r, --release NAME       Helm release name [default: conduit]
   -d, --domain DOMAIN      Domain name [default: conduit.local]
   --skip-hosts             Skip hosts file cleanup
   --force                  Skip confirmation prompts
@@ -563,7 +581,12 @@ kubectl get all -n matrix
 
 ### Example Usage
 
-**Quick Deploy:**
+**Quick Deploy (Recommended):**
+```bash
+./scripts/deploy.sh
+```
+
+**Deploy without modifying /etc/hosts:**
 ```bash
 ./scripts/deploy.sh --skip-hosts
 ```
@@ -582,5 +605,3 @@ kubectl get all -n matrix
 ```bash
 ./scripts/teardown.sh --force
 ```
-
-

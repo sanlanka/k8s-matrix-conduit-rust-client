@@ -69,9 +69,6 @@ spec:
               subPath: conduit.toml
             - name: data
               mountPath: {{ .Values.config.database_path }}
-            - name: tls
-              mountPath: /etc/conduit/tls
-              readOnly: true
       volumes:
         - name: config
           configMap:
@@ -79,9 +76,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "conduit.fullname" . }}-data
-        - name: tls
-          secret:
-            secretName: conduit-tls
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

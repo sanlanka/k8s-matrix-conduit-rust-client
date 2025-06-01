@@ -64,7 +64,7 @@ metadata:
 data:
   default.conf: |
     server {
-        listen 8443 ssl;
+        listen {{ .Values.nginx.service.port | default 8443 }} ssl;
         server_name {{ .Values.nginx.serverName | default "conduit.local" }};
 
         # Use kube-dns service for resolution (works across different k8s setups)

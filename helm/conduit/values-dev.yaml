@@ -15,7 +15,7 @@ nginx:
   serverName: "conduit.local"
   service:
     type: LoadBalancer  # Use LoadBalancer for easy local access
-    port: 8443
+    port: 8448
   tls:
     secretName: "conduit-tls"
 

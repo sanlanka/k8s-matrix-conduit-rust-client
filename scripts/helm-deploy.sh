@@ -141,20 +141,20 @@ if [[ "$ENVIRONMENT" == "dev" ]]; then
     echo -e "${YELLOW}🌐 Setting up port forwarding for local access...${NC}"
     
     # Kill any existing port-forward processes
-    pkill -f "kubectl.*port-forward.*$RELEASE_NAME" || true
+    pkill -f "kubectl.*port-forward.*$RELEASE_NAME.*8448" || pkill -f "kubectl.*port-forward.*$RELEASE_NAME.*8443" || true
     
     # Start port forwarding in background
-    kubectl port-forward -n "$NAMESPACE" svc/"$RELEASE_NAME-nginx" 8443:8443 &
+    kubectl port-forward -n "$NAMESPACE" svc/"$RELEASE_NAME-nginx" 8448:8448 &
     PORT_FORWARD_PID=$!
     
     echo -e "${GREEN}🔗 Port forwarding started (PID: $PORT_FORWARD_PID)${NC}"
-    echo -e "${BLUE}📡 Conduit accessible at: https://conduit.local:8443${NC}"
+    echo -e "${BLUE}📡 Conduit accessible at: https://conduit.local:8448${NC}"
     
     # Wait for port forward to establish
     sleep 5
     
     # Test connectivity
-    if curl -k -s https://localhost:8443/_matrix/client/versions &> /dev/null; then
+    if curl -k -s https://localhost:8448/_matrix/client/versions &> /dev/null; then
         echo -e "${GREEN}✅ Conduit is responding!${NC}"
     else
         echo -e "${YELLOW}⏳ Conduit is starting up, may take a moment...${NC}"
@@ -168,7 +168,7 @@ echo "=================================="
 
 if [[ "$ENVIRONMENT" == "dev" ]]; then
     echo -e "${BLUE}🔗 Development Access:${NC}"
-    echo "• Conduit server: https://conduit.local:8443"
+    echo "• Conduit server: https://conduit.local:8448"
     echo "• Stop port forwarding: kill $PORT_FORWARD_PID"
 fi
 
