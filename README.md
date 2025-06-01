@@ -5,7 +5,7 @@
 This repository provides a complete, production-ready Matrix development environment featuring:
 - **Helm-native Conduit Matrix Server** with automated user management
 - **Nginx Reverse Proxy** with TLS termination for HTTPS access
-- **Local TLS certificates** using mkcert for development
+- **Local TLS certificates** using OpenSSL for development
 - **Rust Matrix SDK Client** with full CLI interface  
 - **Environment-specific configurations** (dev, prod)
 - **Kubernetes Jobs** for automated user setup
@@ -53,24 +53,41 @@ Perfect for building Matrix UIs, testing Matrix applications, or learning the Ma
 
 ### 🎯 Complete Setup (Recommended)
 
-The complete setup script handles everything including TLS certificates, deployment, and testing:
+The unified setup script handles everything including TLS certificates, deployment, and testing:
 
 ```bash
-# Make scripts executable
-chmod +x scripts/*.sh
-
-# Complete setup with TLS certificates + Helm deployment + Rust client + testing
+# Complete setup with TLS certificates + Helm deployment + verification
 ./scripts/deploy.sh
 ```
 
 This script will:
-1. Check prerequisites
-2. Generate local TLS certificates using mkcert
-3. Deploy Conduit Matrix server via Helm
-4. Set up nginx reverse proxy with HTTPS
-5. Create test users automatically
-6. Build and test the Rust Matrix SDK client
-7. Verify the complete setup works
+1. ✅ Check prerequisites (kubectl, helm, openssl)
+2. 🏗️  Create the matrix namespace
+3. 🌐 Add conduit.local to /etc/hosts (dev environment)
+4. 🔐 Generate local TLS certificates using OpenSSL
+5. 🚀 Deploy Conduit Matrix server via Helm
+6. ⏳ Wait for pods to be ready
+7. 👥 Wait for user setup job completion
+8. 🧪 Test the Matrix API endpoint
+9. 🔐 Test user login (if users are created)
+10. 📊 Show deployment status and useful commands
+
+### 🧹 Complete Teardown
+
+When you're done testing or want to clean up everything:
+
+```bash
+# Complete teardown - removes everything
+./scripts/teardown.sh --force --skip-hosts
+```
+
+This script will:
+1. 🗑️ Uninstall the Helm release
+2. 🔍 Find and force-delete any remaining resources
+3. 🗑️ Delete the entire matrix namespace
+4. 🧹 Remove local certificate files
+5. 🏠 Optionally clean up /etc/hosts entry
+6. ✅ Verify complete removal
 
 ### 🔧 Manual Setup (Step-by-Step)
 
@@ -235,9 +252,25 @@ kubectl logs -f deployment/conduit-nginx -n matrix
 
 # Upgrade deployment
 helm upgrade conduit helm/conduit -n matrix -f helm/conduit/values-dev.yaml
+```
 
-# Uninstall completely
+### Cleanup & Teardown Commands
+
+```bash
+# Complete automated teardown (recommended)
+./scripts/teardown.sh --force --skip-hosts
+
+# Manual Helm uninstall only
 helm uninstall conduit -n matrix
+
+# Force delete namespace (if stuck)
+kubectl delete namespace matrix --force --grace-period=0
+
+# Clean up certificate files
+rm -rf certs/ *.pem *.key *.crt
+
+# Remove hosts file entry (optional)
+sudo sed -i.bak '/conduit.local/d' /etc/hosts
 ```
 
 ## 🔧 Configuration Customization
@@ -274,6 +307,17 @@ userSetup:
 ```
 
 ## 🐛 Troubleshooting
+
+### When Things Go Wrong
+
+**First line of defense - Complete reset:**
+```bash
+# If deployment is stuck or behaving unexpectedly:
+./scripts/teardown.sh --force --skip-hosts
+./scripts/deploy.sh --skip-hosts
+```
+
+This solves 90% of deployment issues by starting completely fresh.
 
 ### Common Issues
 
@@ -421,7 +465,8 @@ matrix-conduit-rust-client/
 │       ├── main.rs            # CLI client implementation
 │       └── user_setup.rs      # User registration script
 ├── scripts/
-│   ├── deploy.sh             # Complete setup (recommended)
+│   ├── deploy.sh             # Complete deployment (recommended)
+│   ├── teardown.sh           # Complete cleanup (recommended)
 │   ├── helm-deploy.sh        # Pure Helm deployment
 │   └── generate-tls-cert.sh  # TLS certificate generation
 └── README.md                 # This file
@@ -455,12 +500,87 @@ matrix-conduit-rust-client/
 - [Conduit Documentation](https://gitlab.com/famedly/conduit)
 - [Rust Matrix SDK](https://github.com/matrix-org/matrix-rust-sdk)
 - [Helm Documentation](https://helm.sh/docs/)
-- [mkcert Documentation](https://github.com/FiloSottile/mkcert)
+- [OpenSSL Documentation](https://www.openssl.org/)
 
 ---
 
 **Ready to build production-grade Matrix applications!** 🚀
 
 This setup provides a solid foundation that scales from local development to production deployment.
+
+## ⚡ Quick Reference
+
+### Essential Commands
+
+```bash
+# 🚀 Deploy everything from scratch
+./scripts/deploy.sh --skip-hosts
+
+# 🧪 Test the Matrix API
+curl -k https://conduit.local:8443/_matrix/client/versions
+
+# 🔍 Check deployment status  
+kubectl get all -n matrix
+
+# 🧹 Clean up everything
+./scripts/teardown.sh --force --skip-hosts
+```
+
+### User Credentials (Development)
+- **Admin:** `admin` / `admin123`
+- **Users:** `bob`, `rachel`, `alice`, `charlie` / `{username}123`
+- **Server:** `https://conduit.local:8443`
+
+## 📚 Scripts Reference
+
+| Script | Purpose | Usage |
+|--------|---------|--------|
+| **`scripts/deploy.sh`** | Complete deployment (certificates + Helm) | `./scripts/deploy.sh [options]` |
+| **`scripts/teardown.sh`** | Complete cleanup (Helm + namespace + certs) | `./scripts/teardown.sh [options]` |
+
+### Deploy Script Options
+```bash
+./scripts/deploy.sh [OPTIONS]
+  -e, --environment ENV    Environment (dev/prod) [default: dev]
+  -n, --namespace NS       Kubernetes namespace [default: matrix]  
+  -r, --release NAME       Helm release name [default: conduit]
+  -d, --domain DOMAIN      Domain name [default: conduit.local]
+  --skip-hosts             Skip hosts file setup
+  --skip-prereqs           Skip prerequisite checks
+  -h, --help              Show help
+```
+
+### Teardown Script Options  
+```bash
+./scripts/teardown.sh [OPTIONS]
+  -n, --namespace NS       Kubernetes namespace [default: matrix]
+  -r, --release NAME       Helm release name [default: conduit]  
+  -d, --domain DOMAIN      Domain name [default: conduit.local]
+  --skip-hosts             Skip hosts file cleanup
+  --force                  Skip confirmation prompts
+  -h, --help              Show help
+```
+
+### Example Usage
+
+**Quick Deploy:**
+```bash
+./scripts/deploy.sh --skip-hosts
+```
+
+**Production Deploy:**
+```bash
+./scripts/deploy.sh --environment prod
+```
+
+**Quick Teardown:**
+```bash
+./scripts/teardown.sh --force --skip-hosts
+```
+
+**Complete Clean Teardown:**
+```bash
+./scripts/teardown.sh --force
+```
 
 
